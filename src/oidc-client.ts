@@ -51,6 +51,13 @@ interface IOidcCache {
 const oidcCache = new Map<string, IOidcCache>();
 
 /**
+ * In-flight initialization promises keyed by issuerUrl, to dedupe concurrent
+ * `ensureInitialized()` calls during cold-start (multiple requests racing
+ * before the first OIDC discovery round-trip completes).
+ */
+const oidcInitInFlight = new Map<string, Promise<void>>();
+
+/**
  * Get or build the client auth method based on config.
  *
  * @param config - Auth config
@@ -96,6 +103,10 @@ export async function initializeOidc(config: IAuthConfig): Promise<void> {
 /**
  * Get cached OIDC auth server (throws if not initialized).
  *
+ * Prefer `ensureInitialized(config)` for new code — it auto-discovers when
+ * the cache is empty and dedupes concurrent inits. Kept here for any callers
+ * that explicitly opted into eager `initializeOidc()`.
+ *
  * @param config - Auth config
  * @returns IOidcCache
  */
@@ -103,6 +114,39 @@ function getCache(config: IAuthConfig): IOidcCache {
   const cache = oidcCache.get(config.issuerUrl);
   if (!cache) throw new Error('OIDC not initialized — call initializeOidc(config) first');
   return cache;
+}
+
+/**
+ * Lazy variant of `getCache`: discovers + caches the OIDC server on first
+ * call (per `issuerUrl`), then returns the cached entry on every subsequent
+ * call. Concurrent callers during the first cold-start share a single
+ * in-flight promise so we never race two discoveries.
+ *
+ * Use this from inside request-time code paths (middleware derive, API
+ * handlers) so consumers don't have to remember to call `initializeOidc()`
+ * at boot. Throws if OIDC discovery itself fails.
+ *
+ * @param config - Auth config
+ * @returns IOidcCache once initialization is complete
+ */
+async function ensureInitialized(config: IAuthConfig): Promise<IOidcCache> {
+  const cached = oidcCache.get(config.issuerUrl);
+  if (cached) return cached;
+
+  let inflight = oidcInitInFlight.get(config.issuerUrl);
+  if (!inflight) {
+    inflight = initializeOidc(config).finally(() => {
+      oidcInitInFlight.delete(config.issuerUrl);
+    });
+    oidcInitInFlight.set(config.issuerUrl, inflight);
+  }
+  await inflight;
+
+  const fresh = oidcCache.get(config.issuerUrl);
+  if (!fresh) {
+    throw new Error('OIDC initialization completed but cache is empty — unexpected state');
+  }
+  return fresh;
 }
 
 /**
@@ -120,7 +164,7 @@ export async function verifyAccessToken(
   config: IAuthConfig,
 ): Promise<Result<{ sub: string; email?: string; name?: string }, ResultError<AuthErrorCodeT>>> {
   const result = await tryCatchAsync(async () => {
-    const cache = getCache(config);
+    const cache = await ensureInitialized(config);
     const { payload } = await jose.jwtVerify(token, cache.jwks, { issuer: config.issuerUrl });
     return {
       sub: payload.sub as string,
@@ -142,7 +186,9 @@ export async function verifyAccessToken(
 
 /**
  * Build authorization URL with PKCE parameters.
- * Requires initializeOidc() to have been called first.
+ *
+ * Auto-initialises OIDC discovery on first call (per `issuerUrl`); subsequent
+ * calls hit the cache. No need to call `initializeOidc()` upfront.
  *
  * @param state - Random state string for CSRF protection
  * @param codeChallenge - PKCE code challenge (S256 method)
@@ -150,13 +196,13 @@ export async function verifyAccessToken(
  * @param config - Auth config with clientId
  * @returns Full authorization URL to redirect the user to
  */
-export function buildAuthorizeUrl(
+export async function buildAuthorizeUrl(
   state: string,
   codeChallenge: string,
   redirectUri: string,
   config: IAuthConfig,
-): string {
-  const cache = getCache(config);
+): Promise<string> {
+  const cache = await ensureInitialized(config);
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: config.clientId,
@@ -190,7 +236,7 @@ export async function exchangeCode(
   config: IAuthConfig,
 ): Promise<Result<{ access_token: string; id_token: string; refresh_token?: string; expires_in: number }, ResultError<AuthErrorCodeT>>> {
   const result = await tryCatchAsync(async () => {
-    const { as, client } = getCache(config);
+    const { as, client } = await ensureInitialized(config);
     // Step 1: validate the auth response. Throws on iss/state/error mismatch.
     const validated = oauth.validateAuthResponse(as, client, callbackParams, expectedState);
     // Step 2: exchange the validated code for tokens.

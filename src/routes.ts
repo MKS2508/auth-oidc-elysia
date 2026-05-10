@@ -175,7 +175,7 @@ export function createAuthRoutes(config: IAuthConfig) {
         maxAge: 600, // 10 minutes
       });
 
-      return redirect(buildAuthorizeUrl(state, codeChallenge, config.redirectUri, config));
+      return redirect(await buildAuthorizeUrl(state, codeChallenge, config.redirectUri, config));
     })
 
     /**

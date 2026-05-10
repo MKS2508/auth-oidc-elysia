@@ -1,9 +1,16 @@
 {
   "name": "@mks2508/auth-oidc-elysia",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Pocket ID OIDC plugin for Elysia (PKCE, JWKS, session JWT, requireAuth guard)",
-  "keywords": ["elysia", "oidc", "pocket-id", "auth", "pkce", "jwt"],
+  "keywords": [
+    "elysia",
+    "oidc",
+    "pocket-id",
+    "auth",
+    "pkce",
+    "jwt"
+  ],
   "license": "MIT",
   "author": "mks2508",
   "repository": "github:mks2508/auth-oidc-elysia",
@@ -16,7 +23,11 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "rm -rf dist && rolldown --config rolldown.config.ts && tsc --emitDeclarationOnly",
     "typecheck": "tsgo --noEmit",
