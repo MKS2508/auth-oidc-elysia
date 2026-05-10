@@ -1,0 +1,11 @@
+src/
+tests/
+*.config.ts
+tsconfig.json
+oxlint.json
+.gitignore
+.claude/
+TASK-REQUEST.md
+.plan.md
+bun.lock
+node_modules/

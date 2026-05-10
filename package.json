@@ -1,0 +1,47 @@
+{
+  "name": "@mks2508/auth-oidc-elysia",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Pocket ID OIDC plugin for Elysia (PKCE, JWKS, session JWT, requireAuth guard)",
+  "keywords": ["elysia", "oidc", "pocket-id", "auth", "pkce", "jwt"],
+  "license": "MIT",
+  "author": "mks2508",
+  "repository": "github:mks2508/auth-oidc-elysia",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "rm -rf dist && rolldown --config rolldown.config.ts && tsc --emitDeclarationOnly",
+    "typecheck": "tsgo --noEmit",
+    "lint": "oxlint src/",
+    "test": "bunx vitest run",
+    "publish:npm": "bun run build && npm publish --access public"
+  },
+  "peerDependencies": {
+    "elysia": "^1.4.0",
+    "@elysiajs/jwt": "^1.4.0"
+  },
+  "dependencies": {
+    "oauth4webapi": "^3.8.6",
+    "jose": "^6.2.3",
+    "@mks2508/no-throw": "^0.3.3",
+    "@mks2508/better-logger": "^4.0.0"
+  },
+  "devDependencies": {
+    "elysia": "^1.4.28",
+    "@elysiajs/jwt": "^1.4.0",
+    "rolldown": "^1.0.0-beta.58",
+    "typescript": "^5.9.3",
+    "@typescript/native-preview": "7.0.0-dev.20260509.2",
+    "oxlint": "^0.11.1",
+    "vitest": "^2.1.8",
+    "@types/bun": "latest"
+  }
+}
